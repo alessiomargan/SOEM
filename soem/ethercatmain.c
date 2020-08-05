@@ -91,7 +91,8 @@ static ec_eepromSMt     ec_SM;
 static ec_eepromFMMUt   ec_FMMU;
 /** Global variable TRUE if error available in error stack */
 boolean                 EcatError = FALSE;
-
+/** */
+static boolean          ec_reset_micro = TRUE;
 int64                   ec_DCtime;
 
 ecx_portt               ecx_port;
@@ -118,10 +119,14 @@ ecx_contextt  ecx_context = {
     &ec_FMMU,           // .eepFMMU       =
     NULL,               // .FOEhook()
     NULL,               // .EOEhook()
-    0                   // .manualstatechange
+    0,                   // .manualstatechange
+    &ec_reset_micro,    // .reset_micro   =
 };
 #endif
 
+void ec_reset_micro_slaves(boolean reset_micro) {
+    ec_reset_micro = reset_micro;
+}
 /** Create list over available network adapters.
  *
  * @return First element in list over available network adapters.

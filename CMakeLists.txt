@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.1)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_LIST_DIR}/cmake/Modules")
 project(SOEM C)
 
@@ -24,8 +24,8 @@ if(WIN32)
   set(OS_LIBS wpcap.lib Packet.lib Ws2_32.lib Winmm.lib)
 elseif(UNIX AND NOT APPLE)
   set(OS "linux")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -Werror")
-  set(OS_LIBS pthread rt)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra")
+  #set(OS_LIBS pthread rt)
 elseif(APPLE)
   # This must come *before* linux or MacOSX will identify as Unix.
   set(OS "macosx")
@@ -52,6 +52,22 @@ endif()
 
 message("OS is ${OS}")
 
+option(CMAKE_USE_XENOMAI "Use Xenomai libraries" OFF)
+if ( CMAKE_USE_XENOMAI )
+    find_package(Xenomai 3.1 REQUIRED)
+    if(TARGET Xenomai::cobalt)
+        set(USE_COBALT True)
+    endif()
+endif()
+if ( Xenomai_FOUND )
+    set(OS_LIBS Xenomai::posix pthread rt)
+    set(LIB_TYPE _rt)
+else()
+    set(OS_LIBS pthread rt)
+    set(LIB_TYPE _nrt)
+endif()
+set(SOEM_LIB_NAME soem${LIB_TYPE})
+
 file(GLOB SOEM_SOURCES soem/*.c)
 file(GLOB OSAL_SOURCES osal/${OS}/*.c)
 file(GLOB OSHW_SOURCES oshw/${OS}/*.c)
@@ -60,33 +76,33 @@ file(GLOB SOEM_HEADERS soem/*.h)
 file(GLOB OSAL_HEADERS osal/osal.h osal/${OS}/*.h)
 file(GLOB OSHW_HEADERS oshw/${OS}/*.h)
 
-add_library(soem STATIC
+add_library(${SOEM_LIB_NAME} SHARED
   ${SOEM_SOURCES}
   ${OSAL_SOURCES}
   ${OSHW_SOURCES}
   ${OSHW_EXTRA_SOURCES})
-target_link_libraries(soem ${OS_LIBS})
+target_link_libraries(${SOEM_LIB_NAME} ${OS_LIBS})
 
-target_include_directories(soem PUBLIC
+
+target_include_directories(${SOEM_LIB_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/soem>
   $<INSTALL_INTERFACE:include/soem>)
 
-target_include_directories(soem PUBLIC
+target_include_directories(${SOEM_LIB_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/osal>
   $<INSTALL_INTERFACE:include/soem>)
 
-target_include_directories(soem PUBLIC
+target_include_directories(${SOEM_LIB_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/osal/${OS}>
   $<INSTALL_INTERFACE:include/soem>)
 
-target_include_directories(soem
-  PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/oshw/${OS}>
-  $<INSTALL_INTERFACE:include/soem>
-  )
+target_include_directories(${SOEM_LIB_NAME} PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/oshw/${OS}>
+  $<INSTALL_INTERFACE:include/soem>)
 
 message("LIB_DIR: ${SOEM_LIB_INSTALL_DIR}")
 
-install(TARGETS soem EXPORT soemConfig DESTINATION ${SOEM_LIB_INSTALL_DIR})
+install(TARGETS ${SOEM_LIB_NAME} EXPORT soemConfig DESTINATION ${SOEM_LIB_INSTALL_DIR})
 
 install(EXPORT soemConfig DESTINATION share/soem/cmake)
 

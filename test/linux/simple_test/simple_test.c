@@ -13,6 +13,19 @@
 #include <string.h>
 #include <inttypes.h>
 
+#ifdef __COBALT__
+    #include <cobalt/uapi/signal.h>
+    #include <xenomai/init.h>
+    
+    #ifdef __cplusplus
+    extern "C" {
+    #endif
+    int xenomai_bootstrap_getargv(int *argc, char *const** argv);
+    #ifdef __cplusplus
+    }
+    #endif
+#endif
+
 #include "ethercat.h"
 
 #define EC_TIMEOUTMON 500
@@ -33,6 +46,8 @@ void simpletest(char *ifname)
 
    printf("Starting simple test\n");
 
+   ec_reset_micro_slaves(TRUE);
+   
    /* initialise SOEM, bind socket to ifname */
    if (ec_init(ifname))
    {
@@ -220,10 +235,14 @@ OSAL_THREAD_FUNC ecatcheck( void *ptr )
     }
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char * const argv[])
 {
    printf("SOEM (Simple Open EtherCAT Master)\nSimple test\n");
 
+#ifdef __COBALT__
+    xenomai_bootstrap_getargv(&argc, &argv);
+#endif   
+   
    if (argc > 1)
    {
       /* create thread to handle slave error handling in OP */

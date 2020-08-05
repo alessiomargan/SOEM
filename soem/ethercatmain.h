@@ -426,6 +426,8 @@ struct ecx_context
    int            (*EOEhook)(ecx_contextt * context, uint16 slave, void * eoembx);
    /** flag to control legacy automatic state change or manual state change */
    int            manualstatechange;
+   /** */
+   boolean        *ec_reset_micro;
 };
 
 #ifdef EC_VER1
@@ -440,6 +442,7 @@ extern ec_groupt   ec_group[EC_MAXGROUP];
 extern boolean     EcatError;
 extern int64       ec_DCtime;
 
+void ec_reset_micro_slaves(boolean reset_micro);
 void ec_pusherror(const ec_errort *Ec);
 boolean ec_poperror(ec_errort *Ec);
 boolean ec_iserror(void);

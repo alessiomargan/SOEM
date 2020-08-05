@@ -30,6 +30,14 @@
  * This layer if fully transparent for the higher layers.
  */
 
+#ifdef __COBALT__
+    #include <asm/ioctl.h>
+    #include <rtdm/rtdm.h>
+    //#include <rtnet.h>
+    #define RTIOC_TYPE_NETWORK      RTDM_CLASS_NETWORK
+    #define RTNET_RTIOC_TIMEOUT     _IOW(RTIOC_TYPE_NETWORK,  0x11, int64_t)
+#endif
+
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
@@ -91,7 +99,11 @@ int ecx_setupnic(ecx_portt *port, const char *ifname, int secondary)
 {
    int i;
    int r, rval, ifindex;
+#ifdef __COBALT__
+   int64_t timeout_ns;
+#else
    struct timeval timeout;
+#endif
    struct ifreq ifr;
    struct sockaddr_ll sll;
    int *psock;
@@ -144,14 +156,18 @@ int ecx_setupnic(ecx_portt *port, const char *ifname, int secondary)
    }
    /* we use RAW packet socket, with packet type ETH_P_ECAT */
    *psock = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ECAT));
-
+#ifdef __COBALT__
+    timeout_ns = 10000LL;
+    if ( ioctl(*psock, RTNET_RTIOC_TIMEOUT, &timeout_ns) < 0 )
+         printf("ioctl RTNET_RTIOC_TIMEOUT failed\n");
+#else
    timeout.tv_sec =  0;
    timeout.tv_usec = 1;
    r = setsockopt(*psock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
    r = setsockopt(*psock, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
    i = 1;
    r = setsockopt(*psock, SOL_SOCKET, SO_DONTROUTE, &i, sizeof(i));
-   /* connect socket to NIC by name */
+#endif   /* connect socket to NIC by name */
    strcpy(ifr.ifr_name, ifname);
    r = ioctl(*psock, SIOCGIFINDEX, &ifr);
    ifindex = ifr.ifr_ifindex;

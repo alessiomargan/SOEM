@@ -148,6 +148,49 @@ int ecx_detect_slaves(ecx_contextt *context)
    return wkc;
 }
 
+static int reset_slaves(ecx_contextt *context) {
+
+    int wkc = 0;
+    uint16_t power_on_gpio = 1;
+    uint16_t power_in_gpio = 0;
+    uint8_t try_cnt = 3;
+
+    ///
+    /// Motor Controller C2000 dsp is powered on by et1100
+    /// 
+    ///  
+    if ( context->ec_reset_micro ) {
+       
+       power_on_gpio = 1;
+       wkc = ec_BWR(0x0000, 0x0f10, sizeof(power_on_gpio), &power_on_gpio, EC_TIMEOUTSAFE);
+       osal_usleep(250000);
+       power_on_gpio = 3;
+       wkc = ec_BWR(0x0000, 0x0f10, sizeof(power_on_gpio), &power_on_gpio, EC_TIMEOUTSAFE);
+       osal_usleep(250000);
+       power_on_gpio = 1;
+       wkc = ec_BWR(0x0000, 0x0f10, sizeof(power_on_gpio), &power_on_gpio, EC_TIMEOUTSAFE);
+       osal_usleep(500000);
+       //printf("wkc = %d\n",wkc);
+       while ( try_cnt-- ) {
+            ec_BRD(0x0000, 0x0f18, sizeof(power_in_gpio), &power_in_gpio, EC_TIMEOUTSAFE);
+            if ( power_in_gpio ) {
+                break;
+            }
+        }
+        if ( power_in_gpio == 0 ) {
+            printf("[ECat_master] Failed to reset slaves!\n");
+            //return 0;
+        }
+            // 
+            osal_usleep(1000000); 
+            printf("[ECat_master] POWER ON slaves.\n");
+    } else {
+        printf("[ECat_master] reset_micro set to FALSE \n");
+    }
+    
+    return wkc;
+}
+
 static void ecx_set_slaves_to_default(ecx_contextt *context)
 {
    uint8 b;
@@ -321,6 +364,7 @@ int ecx_config_init(ecx_contextt *context, uint8 usetable)
    wkc = ecx_detect_slaves(context);
    if (wkc > 0)
    {
+      reset_slaves(context);
       ecx_set_slaves_to_default(context);
       for (slave = 1; slave <= *(context->slavecount); slave++)
       {

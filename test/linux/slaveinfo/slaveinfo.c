@@ -15,6 +15,19 @@
 #include <string.h>
 #include <inttypes.h>
 
+#ifdef __COBALT__
+    #include <cobalt/uapi/signal.h>
+    #include <xenomai/init.h>
+    
+    #ifdef __cplusplus
+    extern "C" {
+    #endif
+    int xenomai_bootstrap_getargv(int *argc, char *const** argv);
+    #ifdef __cplusplus
+    }
+    #endif
+#endif
+
 #include "ethercat.h"
 
 char IOmap[4096];
@@ -513,6 +526,8 @@ void slaveinfo(char *ifname)
 
    printf("Starting slaveinfo\n");
 
+   ec_reset_micro_slaves(TRUE);
+   
    /* initialise SOEM, bind socket to ifname */
    if (ec_init(ifname))
    {
@@ -619,11 +634,15 @@ void slaveinfo(char *ifname)
 
 char ifbuf[1024];
 
-int main(int argc, char *argv[])
+int main(int argc, char *const argv[])
 {
    ec_adaptert * adapter = NULL;
    printf("SOEM (Simple Open EtherCAT Master)\nSlaveinfo\n");
 
+#ifdef __COBALT__
+   xenomai_bootstrap_getargv(&argc, &argv);
+#endif 
+    
    if (argc > 1)
    {
       if ((argc > 2) && (strncmp(argv[2], "-sdo", sizeof("-sdo")) == 0)) printSDO = TRUE;
