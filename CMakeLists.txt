@@ -76,7 +76,7 @@ file(GLOB SOEM_HEADERS soem/*.h)
 file(GLOB OSAL_HEADERS osal/osal.h osal/${OS}/*.h)
 file(GLOB OSHW_HEADERS oshw/${OS}/*.h)
 
-add_library(${SOEM_LIB_NAME} SHARED
+add_library(${SOEM_LIB_NAME} STATIC
   ${SOEM_SOURCES}
   ${OSAL_SOURCES}
   ${OSHW_SOURCES}
