@@ -1,7 +1,7 @@
 set(SOURCES simple_ng.c)
 add_executable(simple_ng ${SOURCES})
 if ( Xenomai_FOUND )
-    xenomai_target_bootstrap(simple_test
+    xenomai_target_bootstrap(simple_ng
         SKINS posix
     )
 endif()
