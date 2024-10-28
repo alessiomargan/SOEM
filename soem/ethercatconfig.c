@@ -158,8 +158,8 @@ static int reset_slaves(ecx_contextt *context) {
     ///
     /// Motor Controller C2000 dsp is powered on by et1100
     /// 
-    ///  
-    if ( context->ec_reset_micro ) {
+    ///
+    if ( *context->ec_reset_micro ) {
        
        power_on_gpio = 1;
        wkc = ec_BWR(0x0000, 0x0f10, sizeof(power_on_gpio), &power_on_gpio, EC_TIMEOUTSAFE);
