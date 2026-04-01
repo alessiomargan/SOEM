@@ -34,7 +34,16 @@ foreach(target IN ITEMS
   endif()
 endforeach()
 
-target_link_libraries(soem PUBLIC pthread rt)
+if(Xenomai_FOUND)
+    # use posix skin
+    target_link_libraries(soem PRIVATE
+        Xenomai::posix
+    )
+endif()
+
+target_link_libraries(soem PRIVATE
+    Threads::Threads rt
+)
 
 install(FILES
   osal/linux/osal_defs.h

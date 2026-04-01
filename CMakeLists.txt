@@ -8,6 +8,7 @@ project(SOEM VERSION 2.0.0 LANGUAGES C)
 
 # Debug enable
 option(EC_DEBUG "Enable debug output")
+option(CMAKE_USE_XENOMAI "Use Xenomai libraries" OFF)
 
 # Configurable sizes
 set(EC_BUFSIZE EC_MAXECATFRAME CACHE STRING "standard frame buffer size in bytes")
@@ -46,7 +47,17 @@ set(EC_DEFAULTRETRIES 3 CACHE STRING "default number of retries if wkc <= 0")
 set(EC_PRIMARY_MAC "01:01:01:01:01:01" CACHE STRING "Primary MAC address")
 set(EC_SECONDARY_MAC "04:04:04:04:04:04" CACHE STRING "Secondary MAC address")
 
+find_package(Threads REQUIRED)
+
+if(CMAKE_USE_XENOMAI)
+  find_package(Xenomai REQUIRED)
+  if(TARGET Xenomai::cobalt)
+    set(USE_COBALT True)
+  endif()
+endif()
+
 if(PROJECT_IS_TOP_LEVEL)
+  
   # Make option visible in ccmake, cmake-gui
   option(BUILD_SHARED_LIBS "Build shared library" OFF)
   option(SOEM_BUILD_SAMPLES "Build samples" ON)
