@@ -33,6 +33,13 @@
 
 #define _GNU_SOURCE
 
+#ifdef __COBALT__
+    #include <asm/ioctl.h>
+    #include <rtdm/rtdm.h>
+    #define RTIOC_TYPE_NETWORK      RTDM_CLASS_NETWORK
+    #define RTNET_RTIOC_TIMEOUT     _IOW(RTIOC_TYPE_NETWORK,  0x11, int64_t)
+#endif
+
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
@@ -41,11 +48,11 @@
 #include <sys/time.h>
 #include <time.h>
 #include <arpa/inet.h>
+#include <stdio.h>
 #include <fcntl.h>
 #include <string.h>
 #include <netpacket/packet.h>
 #include <pthread.h>
-#include <poll.h>
 
 #include "oshw.h"
 #include "osal.h"
@@ -93,6 +100,9 @@ int ecx_setupnic(ecx_portt *port, const char *ifname, int secondary)
 {
    int i;
    int r, rval, ifindex;
+#ifdef __COBALT__
+   int64_t timeout_ns;
+#endif
    struct ifreq ifr;
    struct sockaddr_ll sll;
    int *psock;
@@ -149,10 +159,14 @@ int ecx_setupnic(ecx_portt *port, const char *ifname, int secondary)
       return 0;
 
    r = 0;
-#ifndef __COBALT__
+#ifdef __COBALT__
+   timeout_ns = 10000LL; /* 10 us RTDM recv timeout */
+   if (ioctl(*psock, RTNET_RTIOC_TIMEOUT, &timeout_ns) < 0)
+      printf("ioctl RTNET_RTIOC_TIMEOUT failed\n");
+#else
    i = 1;
    r |= setsockopt(*psock, SOL_SOCKET, SO_DONTROUTE, &i, sizeof(i));
-#endif   
+#endif
    /* connect socket to NIC by name */
    strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name) - 1);
    ifr.ifr_name[sizeof(ifr.ifr_name) - 1] = '\0';
@@ -353,7 +367,11 @@ static int ecx_recvpkt(ecx_portt *port, int stacknumber)
       stack = &(port->redport->stack);
    }
    lp = sizeof(port->tempinbuf);
+#ifdef __COBALT__
+   bytesrx = recv(*stack->sock, (*stack->tempbuf), lp, 0);
+#else
    bytesrx = recv(*stack->sock, (*stack->tempbuf), lp, MSG_DONTWAIT);
+#endif
    port->tempinbufs = bytesrx;
 
    return (bytesrx > 0);
@@ -489,42 +507,19 @@ static int ecx_waitinframe_red(ecx_portt *port, uint8 idx, osal_timert *timer)
    /* if not in redundant mode then always assume secondary is OK */
    if (port->redstate == ECT_RED_NONE)
       wkc2 = 0;
-   /* use ppoll to reduce busy_polling */
-   struct pollfd fds[2];
-   struct pollfd *fdsp;
-   int poll_err = 0;
-   struct timespec timeout_spec = {0, 0};
-   timeout_spec.tv_nsec = 50 * 1000;
-   ec_stackT *stack;
-   stack = &(port->stack);
-   fds[0].fd = *stack->sock;
-   fds[0].events = POLLIN;
-   int pollcnt = 1;
-   if (port->redstate != ECT_RED_NONE)
-   {
-      pollcnt = 2;
-      stack = &(port->redport->stack);
-      fds[1].fd = *stack->sock;
-      fds[1].events = POLLIN;
-   }
-   fdsp = &fds[0];
    do
    {
-      poll_err = ppoll(fdsp, pollcnt, &timeout_spec, NULL);
-      if (poll_err >= 0)
+      /* only read frame if not already in */
+      if (wkc <= EC_NOFRAME)
+         wkc = ecx_inframe(port, idx, 0);
+      /* only try secondary if in redundant mode */
+      if (port->redstate != ECT_RED_NONE)
       {
          /* only read frame if not already in */
-         if (wkc <= EC_NOFRAME)
-            wkc = ecx_inframe(port, idx, 0);
-         /* only try secondary if in redundant mode */
-         if (port->redstate != ECT_RED_NONE)
-         {
-            /* only read frame if not already in */
-            if (wkc2 <= EC_NOFRAME)
-               wkc2 = ecx_inframe(port, idx, 1);
-         }
+         if (wkc2 <= EC_NOFRAME)
+            wkc2 = ecx_inframe(port, idx, 1);
       }
-      /* wait for both frames to arrive or timeout */
+   /* wait for both frames to arrive or timeout */
    } while (((wkc <= EC_NOFRAME) || (wkc2 <= EC_NOFRAME)) && !osal_timer_is_expired(timer));
    /* only do redundant functions when in redundant mode */
    if (port->redstate != ECT_RED_NONE)
