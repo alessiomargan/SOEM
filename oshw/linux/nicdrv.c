@@ -53,6 +53,9 @@
 #include <string.h>
 #include <netpacket/packet.h>
 #include <pthread.h>
+#ifndef __COBALT__
+#include <poll.h>
+#endif
 
 #include "oshw.h"
 #include "osal.h"
@@ -506,12 +509,27 @@ static int ecx_waitinframe_red(ecx_portt *port, uint8 idx, osal_timert *timer)
    int wkc = EC_NOFRAME;
    int wkc2 = EC_NOFRAME;
    int primrx, secrx;
+#ifndef __COBALT__
+   /* Use ppoll on Linux to avoid busy polling while waiting for frames. */
+   struct pollfd fds[2] = {{port->sockhandle, POLLIN, 0}, {-1, POLLIN, 0}};
+   nfds_t pollcnt = 1;
+   const struct timespec timeout_spec = {0, 50 * 1000};
+   if (port->redstate != ECT_RED_NONE)
+   {
+      fds[1].fd = port->redport->sockhandle;
+      pollcnt = 2;
+   }
+#endif
 
    /* if not in redundant mode then always assume secondary is OK */
    if (port->redstate == ECT_RED_NONE)
       wkc2 = 0;
    do
    {
+#ifndef __COBALT__
+      if (ppoll(fds, pollcnt, &timeout_spec, NULL) < 0)
+         continue;
+#endif
       /* only read frame if not already in */
       if (wkc <= EC_NOFRAME)
          wkc = ecx_inframe(port, idx, 0);
@@ -522,7 +540,7 @@ static int ecx_waitinframe_red(ecx_portt *port, uint8 idx, osal_timert *timer)
          if (wkc2 <= EC_NOFRAME)
             wkc2 = ecx_inframe(port, idx, 1);
       }
-   /* wait for both frames to arrive or timeout */
+      /* wait for both frames to arrive or timeout */
    } while (((wkc <= EC_NOFRAME) || (wkc2 <= EC_NOFRAME)) && !osal_timer_is_expired(timer));
    /* only do redundant functions when in redundant mode */
    if (port->redstate != ECT_RED_NONE)
